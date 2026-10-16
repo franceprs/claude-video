@@ -155,3 +155,32 @@ def test_actual_ytdlp_exact_track_with_inherited_all(monkeypatch, tmp_path, stat
 def test_explicit_regional_language_is_not_silently_replaced():
     assert download.select_caption({'subtitles': _tracks('en-US')}, 'en-GB') is None
     assert download.select_caption({'subtitles': _tracks('en-US')}, 'en')['key'] == 'en-US'
+
+
+@pytest.mark.parametrize('declared', ['en-US', 'en'])
+def test_dubbed_video_selects_declared_language_orig_track(declared):
+    # #247: dubbed YouTube videos expose one -orig ASR track per audio language;
+    # alphabetical order picked bn-orig (and de-DE-orig) for English sources.
+    info = {'extractor_key': 'Youtube', 'language': declared,
+            'automatic_captions': _tracks('bn-orig', 'de-DE-orig', 'en-orig', 'fr-FR-orig', 'bn', 'de', 'en')}
+    track = download.select_caption(info)
+    assert (track['key'], track['language'], track['provenance']) == ('en-orig', 'en', 'original')
+
+
+def test_dubbed_video_never_swaps_to_another_languages_orig_track():
+    # No -orig track matches the declared language: stay within that language.
+    info = {'extractor_key': 'Youtube', 'language': 'ja',
+            'automatic_captions': _tracks('bn-orig', 'de-DE-orig', 'ja', 'en')}
+    track = download.select_caption(info)
+    assert track['key'] == 'ja' and track['provenance'] == 'unknown'
+
+
+@pytest.mark.parametrize(('metadata', 'expected', 'provenance'), [
+    ('en-US', 'en-orig', 'original'), ('ko', 'ko-orig', 'original'), ('th', 'th-orig', 'original'),
+    (None, 'en-orig', 'unknown')])
+def test_auto_dubbed_video_picks_original_matching_metadata(metadata, expected, provenance):
+    # #255/#257: auto-dubbed videos list 20+ -orig tracks (cWjS56edaUA); ar-orig sorts first.
+    info = {'extractor_key': 'Youtube', 'language': metadata,
+            'automatic_captions': _tracks('ar-orig', 'bn-orig', 'en-orig', 'ko-orig', 'th-orig', 'zu-orig', 'en', 'ar', 'th')}
+    track = download.select_caption(info)
+    assert (track['key'], track['kind'], track['provenance']) == (expected, 'automatic', provenance)
