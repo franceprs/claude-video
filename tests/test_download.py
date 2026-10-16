@@ -173,3 +173,14 @@ def test_dubbed_video_never_swaps_to_another_languages_orig_track():
             'automatic_captions': _tracks('bn-orig', 'de-DE-orig', 'ja', 'en')}
     track = download.select_caption(info)
     assert track['key'] == 'ja' and track['provenance'] == 'unknown'
+
+
+@pytest.mark.parametrize(('metadata', 'expected', 'provenance'), [
+    ('en-US', 'en-orig', 'original'), ('ko', 'ko-orig', 'original'), ('th', 'th-orig', 'original'),
+    (None, 'en-orig', 'unknown')])
+def test_auto_dubbed_video_picks_original_matching_metadata(metadata, expected, provenance):
+    # #255/#257: auto-dubbed videos list 20+ -orig tracks (cWjS56edaUA); ar-orig sorts first.
+    info = {'extractor_key': 'Youtube', 'language': metadata,
+            'automatic_captions': _tracks('ar-orig', 'bn-orig', 'en-orig', 'ko-orig', 'th-orig', 'zu-orig', 'en', 'ar', 'th')}
+    track = download.select_caption(info)
+    assert (track['key'], track['kind'], track['provenance']) == (expected, 'automatic', provenance)
